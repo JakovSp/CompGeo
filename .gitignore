@@ -1,0 +1,9 @@
+compile_commands.json
+\#*\#
+*.o
+*~
+#*
+x11
+.cache/
+convexhull
+build/**

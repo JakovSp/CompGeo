@@ -3,14 +3,17 @@
 #include <stdlib.h>
 #include <math.h>
 
-#define MAXPOINTS 5000
+#define MAXPOINTS 500
+
+enum geotype{
+	none=0, point=1, line=2, circle=3, polygon=4
+};
 
 typedef struct POINT2D{
 	int x;
 	int y;
 }Point2D;
 
-typedef struct MESH Mesh;
 typedef struct LL_POLYGON llPolygon2D;
 
 struct LL_POLYGON{
@@ -18,37 +21,43 @@ struct LL_POLYGON{
 	llPolygon2D* next;
 };
 
-struct MESH{
-	Point2D point;
-	Mesh* points;
-};
-
 typedef struct POLYGON2D{
 	Point2D* points;
 	int numpoints;
-} Polygon2D;
+}Polygon2D;
 
-typedef struct DATASET{
-	size_t start;
-	size_t end;
-}Dataset;
+typedef struct LINE2D{
+	Point2D a;
+	Point2D b;
+}Line2D;
+
+typedef struct CIRCLE2D{
+	Point2D center;
+	float radius;
+}Circle2D;
 
 extern Point2D points[MAXPOINTS];
-extern Polygon2D polygons[100];
-extern Dataset geometry[50];
+extern Line2D lines[MAXPOINTS/2];
+extern Polygon2D polygons[MAXPOINTS/3];
 extern size_t numpoints;
+extern size_t numlines;
 extern size_t numpolygons;
-extern size_t numgeometry;
 
-void UpdateGeometry();
-void AddNewGeometry();
-double AngleTest(Point2D p1, Point2D p2, Point2D p3);
-void ClearGeometry();
-llPolygon2D *llRemoveElement(llPolygon2D *list, llPolygon2D *el);
-int amodb(int a, int b);
+extern enum geotype adding;
+extern size_t adding_start;
+extern size_t adding_end;
+
 void AddNewPoint(int x, int y);
+void AddNewLine(size_t a, size_t b);
+void AddNewConvexPolygon(size_t start, size_t end);
+double Sine(Point2D p1, Point2D p2, Point2D p3);
+double Cross(Point2D p1, Point2D p2, Point2D p3);
+void ClearGeometry();
+void UpdateGeometry();
+void AddGeometry(enum geotype);
+int amodb(int a, int b);
 
+void MergePolygons(Polygon2D p1, Polygon2D p2);
 Polygon2D ConvexHull(Point2D* inputpoints, int npoints);
-void MergePolygon();
 
 #endif

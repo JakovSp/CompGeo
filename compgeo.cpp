@@ -1,65 +1,56 @@
 #include "compgeo.h"
 
 Point2D points[MAXPOINTS];
-Polygon2D polygons[100];
-Dataset geometry[50];
-size_t numpoints;
-size_t numpolygons;
-size_t numgeometry;
+Line2D lines[MAXPOINTS/2];
+Polygon2D polygons[MAXPOINTS/3];
+size_t numpoints = 0;
+size_t numlines = 0;
+size_t numpolygons = 0;
 
-void UpdateGeometry(){
-	for(size_t i = 0; i < numgeometry; i++){
-		polygons[i] = ConvexHull(&points[geometry[i].start], geometry[i].end - geometry[i].start);
-	}
+geotype adding=none;
+size_t adding_start=0;
+size_t adding_end=0;
+
+void AddNewPoint(int x, int y){
+	points[numpoints].x = x;
+	points[numpoints].y = y;
+	numpoints++;
+	adding_end=numpoints-1;
 }
 
-void AddNewGeometry(){
-	if(numgeometry){
-		if(geometry[numgeometry-1].end - geometry[numgeometry-1].start == 0){
-			return;
-		}
-		geometry[numgeometry-1].end = numpoints;
-	}
+void AddNewLine(size_t a, size_t b){
+	lines[numlines].a = points[a];
+	lines[numlines].b = points[b];
+	numlines++;
+}
 
-	geometry[numgeometry].start = numpoints;
-	geometry[numgeometry].end = numpoints;
-	numgeometry++;
+void AddNewConvexPolygon(size_t start, size_t end){
+	polygons[numpolygons] = ConvexHull(&points[start], end-start+1);
 	numpolygons++;
 }
 
-
-double AngleTest(Point2D p1, Point2D p2, Point2D p3){
+double Sine(Point2D p1, Point2D p2, Point2D p3){
 	int adx = p2.x - p1.x;
 	int ady = p1.y - p2.y;
 	int bdx = p3.x - p1.x;
 	int bdy = p1.y - p3.y;
+	return atan2(bdy, bdx) - atan2(ady, adx);
+}
 
-	// return atan2(bdy, bdx) - atan2(ady, adx);
-
-	// return adx*((float)(ady)/adx - (float)(bdy)/bdx);
-
-	// float a = sqrt(pow(adx, 2) + pow(ady, 2));
-	// float b = sqrt(pow(bdx, 2) + pow(bdy, 2));
-
-	// cross product:
+double Cross(Point2D p1, Point2D p2, Point2D p3){
+	int adx = p2.x - p1.x;
+	int ady = p1.y - p2.y;
+	int bdx = p3.x - p1.x;
+	int bdy = p1.y - p3.y;
 	return (adx*bdy - ady*bdx);
 }
 
 void ClearGeometry(){
 	numpoints = 0;
 	numpolygons = 0;
-	numgeometry = 0;
-}
-
-llPolygon2D* llRemoveElement(llPolygon2D* list, llPolygon2D* el){
-	for(llPolygon2D* cur = list->next; cur != NULL; cur = cur->next){
-		if(cur->next == el){
-			cur->next = el->next;
-			free(el);
-			return cur->next;
-		}
-	}
-	return NULL;
+	numlines = 0;
+	adding_start = 0;
+	adding_end = 0;
 }
 
 int amodb(int a, int b){
@@ -67,9 +58,39 @@ int amodb(int a, int b){
 	return r < 0 ? r + b : r;
 }
 
-void AddNewPoint(int x, int y){
-	points[numpoints].x = x;
-	points[numpoints].y = y;
-	numpoints++;
-	geometry[numgeometry-1].end++;
+void AddGeometry(enum geotype newgeo){
+	switch(newgeo){
+	case line:
+		if(adding_end){
+			adding_start=adding_end+1;
+			adding_end++;
+		}
+		AddNewLine(adding_start, adding_end);
+		adding=newgeo;
+		break;
+	case polygon:
+		adding_start=adding_end+1;
+		adding_end++;
+		AddNewConvexPolygon(adding_start, adding_end);
+		adding=newgeo;
+		break;
+	case point:
+	case none:
+	default:
+		return;
+		break;
+	}	
+}
+
+void UpdateGeometry(){
+	switch(adding){
+	case line:
+		lines[numlines-1].b = points[adding_end];
+		break;
+	case polygon:
+		polygons[numpolygons-1] = ConvexHull(&points[adding_start], adding_end - adding_start + 1);
+		break;
+	default:
+		break;
+	}
 }

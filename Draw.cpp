@@ -76,7 +76,9 @@ void Draw(Framebuffer* framebuffer){
 	for(size_t i = 0; i < numpoints; i++){
 		DrawPoint(framebuffer, points[i].x, points[i].y);
 	}
-
+	for(size_t i = 0; i < numlines; i++){
+		DrawLine(framebuffer, lines[i].a.x, lines[i].a.y, lines[i].b.x, lines[i].b.y);
+	}
 	for(size_t i = 0; i < numpolygons; i++){
 		DrawPolygon(framebuffer, polygons[i]);
 	}

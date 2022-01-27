@@ -114,22 +114,30 @@ Polygon2D ConnectConvex(Polygon2D p1, Polygon2D p2){
 	int ta1, ta2;
 	int tb1, tb2;
 
-	// Lower tangent
+	if(p1.points[0].x > p2.points[0].x){
+		Polygon2D temp = p1;
+		p1 = p2;
+		p2 = temp;
+	}
+
+	// Upper tangent
 	// test left-top line segment
-	for(int left = 1; left != 2; left=amodb((left-1),p1.numpoints)){
+	for(int top = 0; top <= p1.numpoints-1; top=amodb(top+1,p1.numpoints)){
 		int test = 1;
-		int top = amodb((left-1),p1.numpoints);
-		int right = amodb((left-2),p1.numpoints);
-		double sine = 0;
+		int left = amodb((top-1),p1.numpoints);
+		int right = amodb((top+1),p1.numpoints);
+		tb2 = 0;
+		double diff = 0;
 		double r = DBL_MAX;
 		// if left-top segment is covering ALL points in opposing polygon:
 		for(int k = 0; k < p2.numpoints; k++){
-			if( (sine = AngleTest(p1.points[left], p1.points[top], p2.points[k])) < 0 ){
+			diff = Sine(p1.points[left], p1.points[top], p2.points[k]);
+			if( diff > 0 ){
 				test = 0;
 				break;
 			}
-			if(sine < r){
-				r = sine;
+			if(abs(diff) < abs(r)){
+				r = diff;
 				ta2 = k;
 			}
 		}
@@ -140,7 +148,7 @@ Polygon2D ConnectConvex(Polygon2D p1, Polygon2D p2){
 		// if top-right segment is NOT covering AT LEAST ONE point in opposing polygon:
 		test = 0;
 		for(int k = 0; k < p2.numpoints; k++){
-			if( AngleTest(p1.points[top], p1.points[right], p2.points[k]) < 0 ){
+			if( Sine(p1.points[top], p1.points[right], p2.points[k]) > 0 ){
 				test = 1;
 				break;
 			}
@@ -152,22 +160,21 @@ Polygon2D ConnectConvex(Polygon2D p1, Polygon2D p2){
 		}
 	}
 
-	// Upper tangent
-	for(int left = p1.numpoints-1; left != p1.numpoints-2; left=amodb(left+1,p1.numpoints)){
+	// Lower tangent
+	for(int left = 1; left != 2; left=amodb((left-1),p1.numpoints)){
 		int test = 1;
-		int top = amodb((left+1),p1.numpoints);
-		int right = amodb((top+1),p1.numpoints);
-		tb2 = 0;
-		double angle = 0;
+		int top = amodb((left-1),p1.numpoints);
+		int right = amodb((left-2),p1.numpoints);
+		double diff = 0;
 		double r = DBL_MAX;
 		for(int k = 0; k < p2.numpoints; k++){
-			angle = AngleTest(p1.points[left], p1.points[top], p2.points[k]);
-			if( angle > 0 && angle < M_PI_2 ){
+			diff = Sine(p1.points[left], p1.points[top], p2.points[k]);
+			if( diff < 0 ){
 				test = 0;
 				break;
 			}
-			if(angle < r){
-				r = angle;
+			if(abs(diff) < abs(r)){
+				r = diff;
 				tb2 = k;
 			}
 		}
@@ -175,7 +182,7 @@ Polygon2D ConnectConvex(Polygon2D p1, Polygon2D p2){
 			continue;
 		test = 0;
 		for(int k = 0; k < p2.numpoints; k++){
-			if( AngleTest(p1.points[top], p1.points[right], p2.points[k]) > 0 ){
+			if( Sine(p1.points[top], p1.points[right], p2.points[k]) < 0 ){
 				test = 1;
 				break;
 			}
@@ -186,24 +193,35 @@ Polygon2D ConnectConvex(Polygon2D p1, Polygon2D p2){
 		}
 	}
 
-	ConvexPolygon.numpoints =   tb1+1 + p1.numpoints-ta1 +
-								ta2+1 + p2.numpoints-tb2;
-	ConvexPolygon.points = (Point2D*)malloc(sizeof(Point2D)*2);
+	int firsthull = ta1+1;
+	int secondhull = 0;
+	if(tb2){
+		secondhull = tb2-ta2+1;
+	} else {
+		secondhull = p2.numpoints-ta2+1;
+	}
+	int thirdhull=0;
+	if(tb1)
+		thirdhull = p1.numpoints-tb1;
+
+	ConvexPolygon.numpoints = firsthull + secondhull + thirdhull;
+								
+	ConvexPolygon.points = (Point2D*)malloc(sizeof(Point2D)*ConvexPolygon.numpoints);
+	memset(ConvexPolygon.points,0,sizeof(Point2D)*ConvexPolygon.numpoints);
+	for(int i = 0; i < firsthull; i++)
+		ConvexPolygon.points[i] = p1.points[i];
+	for(int i = 0; i < secondhull; i++)
+		ConvexPolygon.points[firsthull+i] = p2.points[(ta2+i)%p2.numpoints];
+	for(int i = 0; i < thirdhull; i++)
+		ConvexPolygon.points[firsthull+secondhull+i] = p1.points[tb1+i];
+	
 	return ConvexPolygon;
 }
 
-void MergePolygon(){
-	if(numpolygons >= 2){
-		Polygon2D newpolygon = ConnectConvex(polygons[numpolygons-2],polygons[numpolygons-1]);
-		// 	free(polygons[numpolygons-1].points);
-		// 	free(polygons[numpolygons-2].points);
-		// 	numgeometry--;
-		// 	numpolygons--;
-		// 	polygons[numpolygons-1] = newpolygon;
-
-		// numgeometry++;
-		// numpolygons++;
-
-	}
-
+void MergePolygons(Polygon2D p1, Polygon2D p2){
+	Polygon2D newpolygon = ConnectConvex(p1, p2);
+	free(p1.points);
+	free(p2.points);
+	numpolygons--;
+	polygons[numpolygons-1] = newpolygon;
 }

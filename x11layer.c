@@ -4,9 +4,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include "compgeo.h"
 #include "x11layer.h"
 
 static int running = 1;
+
 
 void ClearScreen(Framebuffer* fb, int clscolor){
 	memset(fb->data, clscolor, fb->width*fb->height*4);
@@ -102,11 +104,18 @@ int main(void) {
 				XFlush(offscreen->dpy);
 				break;
 			case KeyPress:
-				if(e.xkey.keycode == XKeysymToKeycode(offscreen->dpy,XK_N)){
-					AddNewGeometry();
+				if(e.xkey.keycode == XKeysymToKeycode(offscreen->dpy,XK_M)){
+					if(numpolygons >= 2) {
+						MergePolygons(polygons[numpolygons-2],polygons[numpolygons-1]);
+						ClearScreen(offscreen->framebuffer, 0);
+						x11RedrawDisplay(offscreen, width, height);
+					}
 				}
 				if(e.xkey.keycode == XKeysymToKeycode(offscreen->dpy,XK_C)){
-					MergePolygon();
+					AddGeometry(polygon);
+				}
+				if(e.xkey.keycode == XKeysymToKeycode(offscreen->dpy,XK_L)){
+					AddGeometry(line);
 				}
 				if(e.xkey.keycode == XKeysymToKeycode(offscreen->dpy,XK_Escape))
 					running = 0;

@@ -6,7 +6,7 @@ Convex polygon is a polygon such that every line segment between any of two poin
 *** Controls
 L - add new line \\
 C - add new convex hull \\
-M - merge/stitch together last two convex hulls into a new convex hull \\ 
+M - merge/stitch together last two convex hulls into a new convex hull \\
 Space - clear all geometry \\
 Esc - quit \\
 

@@ -46,6 +46,12 @@ double Cross(Point2D p1, Point2D p2, Point2D p3){
 }
 
 void ClearGeometry(){
+	for(int i = 0; i < numpolygons; i++){
+		if(polygons[i].points){
+			free( polygons[i].points );
+			polygons[i].points = NULL;
+		}
+	}
 	numpoints = 0;
 	numpolygons = 0;
 	numlines = 0;

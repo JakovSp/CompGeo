@@ -1,12 +1,20 @@
-C=g++
-CFLAGS=-g
-COMPILE=$(C) $(CFLAGS)
+CXX=g++
+LINK=-lm -lX11
+DEBUG=-g -DDEBUG
+CXXFLAGS=$(DEBUG)
+COMPILE=$(CXX) $(CXXFLAGS) 
+
+MPICXX=mpicxx
+MPI_LINK=$(LINK) $(shell $(MPICXX) --showme:link)
+MPI_COMPILE_FLAGS=$(shell $(MPICXX) --showme:compile)
+MPI_CXXFLAGS=$(CXXFLAGS) $(MPI_COMPILE_FLAGS)
+MPI_COMPILE=$(MPICXX) $(MPI_CXXFLAGS)
 BUILD=build
 
 all: compgeo
 
 compgeo: compgeo.cpp $(BUILD)/Draw.o $(BUILD)/x11layer.o $(BUILD)/convexhull.o
-	$(COMPILE) -o $(BUILD)/compgeo compgeo.cpp $(BUILD)/*.o -lm -lX11
+	$(MPI_COMPILE) -o $(BUILD)/compgeo compgeo.cpp $(BUILD)/*.o $(MPI_LINK)
 
 $(BUILD)/Draw.o: Draw.cpp Draw.h compgeo.h build
 	$(COMPILE) -c -o $(BUILD)/Draw.o Draw.cpp

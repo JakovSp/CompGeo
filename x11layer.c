@@ -1,14 +1,25 @@
+#include <fstream>
+#include <openmpi/ompi/mpi/cxx/mpicxx.h>
 #include <X11/X.h>
 #include <X11/Xlib.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
+#include <unistd.h>
 #include <sys/types.h>
+#include <time.h>
+
+#include "Draw.h"
 #include "compgeo.h"
 #include "x11layer.h"
 
+int mpi_rank;
+int mpi_size;
+
 static int running = 1;
 
+void MPI_MainHull(int width, int height);
 
 void ClearScreen(Framebuffer* fb, int clscolor){
 	memset(fb->data, clscolor, fb->width*fb->height*4);
@@ -32,21 +43,20 @@ void x11FlipBackbuffer(Displaybuffer* offscreen){
 }
 
 void ResizeBackbuffer(Displaybuffer* offscreen, int width, int height, int depth){
-	if(offscreen->framebuffer->data){
+	Framebuffer* fb = offscreen->framebuffer;
+	if(fb->data){
 		XDestroyImage(offscreen->ximage);
 		XFreePixmap(offscreen->dpy, offscreen->pixmap);
 	}
 
+	fb->width = width;
+	fb->height = height;
+	fb->fragment = (depth>>3)+1; // NOTE: Bit depth has to be a byte multiple (2^3)
 
-	offscreen->framebuffer->width = width;
-	offscreen->framebuffer->height = height;
-	offscreen->framebuffer->depth = depth;
-
-	offscreen->framebuffer->data = (int*)malloc(width*height*4);
-	memset(offscreen->framebuffer->data, 0, width*height*4);
+	offscreen->framebuffer->data = (int*)malloc(width*height*fb->fragment);
+	memset(offscreen->framebuffer->data, 0, width*height*fb->fragment);
 	offscreen->pixmap = XCreatePixmap(offscreen->dpy, offscreen->win, width, height, depth);
-	offscreen->ximage = XCreateImage(offscreen->dpy, offscreen->xvisual, depth, ZPixmap, 0, (char*)offscreen->framebuffer->data, width, height, 32, 0);
-
+	offscreen->ximage = XCreateImage(offscreen->dpy, offscreen->xvisual, depth, ZPixmap, 0, (char*)fb->data, width, height, 32, 0);
 }
 
 Displaybuffer* x11InitDisplayBuffer(){
@@ -82,16 +92,15 @@ Displaybuffer* x11InitDisplayBuffer(){
 	height = attrs.height;
 	width = attrs.width;
 
+	mainbuffer->framebuffer->data = NULL;
 	ResizeBackbuffer(mainbuffer, width, height, 24);
-	
 	return mainbuffer;
 }
 
-int main(void) {
+void MainWindowLoopback(){
 	XEvent e;
-	Displaybuffer* offscreen;
 	int width, height;
-
+	Displaybuffer* offscreen;
 	offscreen = x11InitDisplayBuffer();
 
 	ClearGeometry();
@@ -104,9 +113,14 @@ int main(void) {
 				XFlush(offscreen->dpy);
 				break;
 			case KeyPress:
+				if(e.xkey.keycode == XKeysymToKeycode(offscreen->dpy,XK_P)){
+					ClearScreen(offscreen->framebuffer, 0);
+					MPI_MainHull(width, height);
+					x11RedrawDisplay(offscreen, width, height);
+				}
 				if(e.xkey.keycode == XKeysymToKeycode(offscreen->dpy,XK_M)){
 					if(numpolygons >= 2) {
-						MergePolygons(polygons[numpolygons-2],polygons[numpolygons-1]);
+						MergePolygons(polygons[numpolygons-2], polygons[numpolygons-1]);
 						ClearScreen(offscreen->framebuffer, 0);
 						x11RedrawDisplay(offscreen, width, height);
 					}
@@ -117,8 +131,12 @@ int main(void) {
 				if(e.xkey.keycode == XKeysymToKeycode(offscreen->dpy,XK_L)){
 					AddGeometry(line);
 				}
-				if(e.xkey.keycode == XKeysymToKeycode(offscreen->dpy,XK_Escape))
+				if(e.xkey.keycode == XKeysymToKeycode(offscreen->dpy,XK_Escape)){
 					running = 0;
+					// signal the rest of the MPI ranks within Comm
+					for(int i = 1; i<mpi_size; i++)
+						MPI_Send(&running,1,MPI_INT,i,MPI_WORKER+i-1,MPI_COMM_WORLD);
+				}
 				if(e.xkey.keycode == XKeysymToKeycode(offscreen->dpy,XK_space)){
                     ClearGeometry();
 					ClearScreen(offscreen->framebuffer, 0);
@@ -147,7 +165,20 @@ int main(void) {
 	XDestroyImage(offscreen->ximage);
 	XFreePixmap(offscreen->dpy, offscreen->pixmap);
 	XCloseDisplay(offscreen->dpy);
-	/* free(offscreen->framebuffer); */
-	/* free(offscreen); */
+}
+
+int main(int argc, char** argv) {
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+
+	if(mpi_rank != MPI_MAIN_RANK){
+		MPI_ConvexHull(0);
+	} else{
+		MainWindowLoopback();
+	}
+
+	MPI_Finalize();
+
 	return 0;
 }

@@ -8,7 +8,7 @@ typedef struct FRAMEBUFFER{
 	void* data;
 	int width;
 	int height;
-	int depth;
+	int fragment;
 }Framebuffer;
 
 void Draw(Framebuffer* framebuffer);

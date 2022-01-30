@@ -3,7 +3,14 @@
 #include <stdlib.h>
 #include <math.h>
 
-#define MAXPOINTS 500
+#include <openmpi/ompi/mpi/cxx/mpicxx.h>
+extern int mpi_rank;
+extern int mpi_size;
+#define MPI_MAIN_RANK 0
+#define MPI_WORKER 100
+
+#define MAXPOINTS 1000
+#define SAMPLE_SIZE 500
 
 enum geotype{
 	none=0, point=1, line=2, circle=3, polygon=4
@@ -59,5 +66,16 @@ int amodb(int a, int b);
 
 void MergePolygons(Polygon2D p1, Polygon2D p2);
 Polygon2D ConvexHull(Point2D* inputpoints, int npoints);
+void MPI_ConvexHull(size_t numdata);
+
+inline void DebugPrint(const char *__restrict format, ...){
+#ifdef DEBUG
+	printf("Rank: %d ", mpi_rank);
+	va_list argptr;
+	va_start(argptr, format);
+	vprintf(format, argptr);
+	va_end(argptr);
+#endif
+}
 
 #endif

@@ -7,7 +7,9 @@ void PutPixel(Framebuffer* fb, int x, int y){
 	int height = fb->height;
 	x = clip(x,0,width);
 	y = clip(y,0,height);
-	int offset = width*4*y + x*4;
+
+	int offset = width*fb->fragment*y + x*fb->fragment;
+
 	u_int8_t* pixel = (u_int8_t*)(fb->data)+offset;
 	*pixel = 0xFF;
 	*(pixel + 1) = 0xFF;

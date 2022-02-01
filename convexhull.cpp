@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <stdio.h>
+#include <sys/types.h>
 #include <x86_64-pc-linux-gnu/mpi.h>
 #include "compgeo.h"
 
@@ -70,7 +71,7 @@ Polygon2D ConvexHull(Point2D* inputpoints, int npoints){
 	}
 	
 	// Lower hull
-	// FIXME: borked, sometimes doesn't get constructed properly
+	// FIXME: often doesn't get constructed properly
 	start = npoints-1;
 	while(start >= 1){
 		int end = start-1;
@@ -107,9 +108,8 @@ Polygon2D ConvexHull(Point2D* inputpoints, int npoints){
 	return ConvexPolygon;
 }
 
-// NOTE: Works correctly when convex polygons are intersecting at most
-// once;
-// TODO: Create a separate method to cover all cases
+// NOTE: Works correctly when convex polygons are intersecting at most once;
+// TODO: Create a separate method to cover all polygon intersection cases
 Polygon2D ConnectConvex(Polygon2D p1, Polygon2D p2){
 	// assume p1 and p2 are convex
 	Polygon2D ConvexPolygon;
@@ -132,7 +132,7 @@ Polygon2D ConnectConvex(Polygon2D p1, Polygon2D p2){
 		tb2 = 0;
 		double diff = 0;
 		double r = DBL_MAX;
-		// if left-top segment is covering ALL points in opposing polygon:
+		// if left-top segment is covering *ALL* points in opposing polygon:
 		for(int k = 0; k < p2.numpoints; k++){
 			diff = Sine(p1.points[left], p1.points[top], p2.points[k]);
 			if( diff > 0 ){
@@ -148,7 +148,7 @@ Polygon2D ConnectConvex(Polygon2D p1, Polygon2D p2){
 		if(!test)
 			continue;
 		// test top-right line segment
-		// if top-right segment is NOT covering AT LEAST ONE point in opposing polygon:
+		// if top-right segment is *NOT* covering *AT LEAST ONE* point in opposing polygon:
 		test = 0;
 		for(int k = 0; k < p2.numpoints; k++){
 			if( Sine(p1.points[top], p1.points[right], p2.points[k]) > 0 ){
@@ -223,35 +223,47 @@ Polygon2D ConnectConvex(Polygon2D p1, Polygon2D p2){
 
 void MergePolygons(Polygon2D p1, Polygon2D p2){
 	Polygon2D newpolygon = ConnectConvex(p1, p2);
-	free(p1.points);
-	free(p2.points);
+	if(p1.points)
+		free(p1.points);
+	p1.points = NULL;
+	if(p2.points)
+		free(p2.points);
+	p2.points = NULL;
+
 	numpolygons--;
 	polygons[numpolygons-1] = newpolygon;
 }
 
-void MPI_ConvexHull(size_t numdata){
+void MPI_ConvexHull(){
+	int numdata;
 	MPI_Recv(&numdata, 1, MPI_INT, MPI_MAIN_RANK, MPI_WORKER+mpi_rank-1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 	Point2D* inputpoints = NULL;
 	while(numdata){
 		DebugPrint("Received job from Main Rank(%d)\n", MPI_MAIN_RANK);
-		if(inputpoints){free(inputpoints);}
+		if(inputpoints){
+			if(inputpoints)
+				free(inputpoints);
+			inputpoints = NULL;
+		}
 		inputpoints = (Point2D*)malloc(sizeof(Point2D)*numdata);
 
 		DebugPrint("Receiving point data\n");
         MPI_Recv(inputpoints, numdata*sizeof(Point2D), MPI_BYTE, 0, MPI_WORKER+mpi_rank-1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 		DebugPrint("Received point data\n");
 
-		DebugPrint("Creating Convex Hull on %lu points\n", numdata);
+		// DebugPrint("Creating Convex Hull on %lu points\n", numdata);
 		Polygon2D polygon = ConvexHull(inputpoints, numdata);
 
 		DebugPrint("Sending new convex polygon\n");
 		MPI_Send(&polygon.numpoints, 1, MPI_INT, 0, 1, MPI_COMM_WORLD);
 		DebugPrint("Sending %d data\n", polygon.numpoints);
-		MPI_Send(polygon.points, polygon.numpoints*sizeof(Polygon2D), MPI_BYTE, 0, 2, MPI_COMM_WORLD);
-
+		MPI_Send(polygon.points, polygon.numpoints*sizeof(Point2D), MPI_BYTE, 0, 2, MPI_COMM_WORLD);
 		MPI_Recv(&numdata, 1, MPI_INT, MPI_MAIN_RANK, MPI_WORKER+mpi_rank-1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+		DebugPrint("Received new task, clearing geometry\n", polygon.numpoints);
 	}
 	DebugPrint("Finalizing\n");
+	if(inputpoints)
+		free(inputpoints);
 }
 
 
@@ -259,6 +271,7 @@ void MPI_MainHull(int width, int height){
 	// randomize points across width and height
 	int numdata = SAMPLE_SIZE;
 
+	DebugPrint("Generating random points\n");
 	srand(time(NULL));
 	for(int i = 0; i < SAMPLE_SIZE; i++){
 		points[i].x = 200 + rand()%(width-400);
@@ -268,24 +281,28 @@ void MPI_MainHull(int width, int height){
 	}
 	
 	// Initial hull
-	// TODO: IPC using shared memory across MPI Communicator. One
+	// TODO: Emulate IPC using shared memory across *MPI Communicator*. One
 	// communicator per shared memory domain
 	for(int i = 1; i<mpi_size; i++){
+
 		DebugPrint("Sending %d data to Rank: %d\n", numdata, i);
 		// QUERY: Immediate send? Buffered send? 
 		MPI_Send(&numdata, 1, MPI_INT, i, MPI_WORKER+i-1, MPI_COMM_WORLD);
-		MPI_Send(&points[adding_start], numdata*sizeof(Point2D), MPI_BYTE,i,MPI_WORKER+i-1,MPI_COMM_WORLD);
+		MPI_Send(&points[adding_start], numdata*sizeof(Point2D), MPI_BYTE, i, 
+				  MPI_WORKER+i-1, MPI_COMM_WORLD);
 
 		// ConvexHull(Point2D *inputpoints, int npoints);
+
+		DebugPrint("Waiting for new polygon data from Rank: %d\n", i);
 		MPI_Recv(&(polygons[numpolygons].numpoints), 1, MPI_INT, i, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE); 
 		polygons[numpolygons].points = (Point2D*)malloc(polygons[numpolygons].numpoints*sizeof(Point2D));
-		DebugPrint("Received new convex polygon from Rank: %d\n", i);
-
-		MPI_Recv(polygons[numpolygons].points, polygons[numpolygons].numpoints*sizeof(Polygon2D), MPI_BYTE, i, 2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-		DebugPrint("Received new polygon data from Rank: %d\n", i);
+		MPI_Recv(polygons[numpolygons].points, polygons[numpolygons].numpoints*sizeof(Point2D), MPI_BYTE, i, 2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+		DebugPrint("Received %d new polygon data from Rank: %d\n", 
+				   polygons[numpolygons].numpoints, i);
 		numpolygons++;
 	}
 
-	// TODO: Stitching hulls
+	// TODO: Parallel stitching hulls
+	// QUERY: Using OpenMP?
 	// MergePolygons(Polygon2D p1, Polygon2D p2);
 }

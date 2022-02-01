@@ -43,9 +43,9 @@ typedef struct CIRCLE2D{
 	float radius;
 }Circle2D;
 
-extern Point2D points[MAXPOINTS];
-extern Line2D lines[MAXPOINTS/2];
-extern Polygon2D polygons[MAXPOINTS/3];
+extern Point2D* points;
+extern Line2D* lines;
+extern Polygon2D* polygons;
 extern size_t numpoints;
 extern size_t numlines;
 extern size_t numpolygons;
@@ -66,7 +66,7 @@ int amodb(int a, int b);
 
 void MergePolygons(Polygon2D p1, Polygon2D p2);
 Polygon2D ConvexHull(Point2D* inputpoints, int npoints);
-void MPI_ConvexHull(size_t numdata);
+void MPI_ConvexHull();
 
 inline void DebugPrint(const char *__restrict format, ...){
 #ifdef DEBUG
@@ -77,5 +77,11 @@ inline void DebugPrint(const char *__restrict format, ...){
 	va_end(argptr);
 #endif
 }
+
+// NOTE: simple text replace to call valgrind wrappers
+#ifdef DEBUG
+#define MPI_Send PMPI_Send
+#define MPI_Recv PMPI_Recv
+#endif
 
 #endif

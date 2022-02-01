@@ -1,8 +1,8 @@
 #include "compgeo.h"
 
-Point2D points[MAXPOINTS];
-Line2D lines[MAXPOINTS/2];
-Polygon2D polygons[MAXPOINTS/3];
+Point2D* points = NULL;
+Line2D* lines = NULL;
+Polygon2D* polygons = NULL;
 size_t numpoints = 0;
 size_t numlines = 0;
 size_t numpolygons = 0;
@@ -46,15 +46,17 @@ double Cross(Point2D p1, Point2D p2, Point2D p3){
 }
 
 void ClearGeometry(){
+	memset(points, 0, numpoints*sizeof(Point2D));
+	memset(lines, 0, numlines*sizeof(Line2D));
 	for(int i = 0; i < numpolygons; i++){
-		if(polygons[i].points){
+		if(polygons[i].points)
 			free( polygons[i].points );
-			polygons[i].points = NULL;
-		}
 	}
+	memset(polygons, 0, numpolygons*sizeof(Polygon2D));
+
 	numpoints = 0;
-	numpolygons = 0;
 	numlines = 0;
+	numpolygons = 0;
 	adding_start = 0;
 	adding_end = 0;
 }

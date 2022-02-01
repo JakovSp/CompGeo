@@ -1,0 +1,19 @@
+#!/bin/sh
+LEAK_FLAGS="--leak-check=full --show-leak-kinds=all"
+VALGRIND_TOOL="--tool=memcheck"
+VALGRIND_FLAGS="$VALGRIND_TOOL $LEAK_FLAGS"
+
+BEAR="$(command -v bear)" 
+$BEAR make -k
+
+VALGRIND_RUN="$(command -v valgrind)" 
+if test -f $VALGRIND
+then
+	VALGRIND_RUN="valgrind $VALGRIND_FLAGS "
+fi
+
+# disable running valgrind
+VALGRIND_RUN=""
+MPI_RUN="mpiexec -np 2 "
+RUN=$VALGRIND_RUN$MPI_RUN
+$RUN ./build/compgeo

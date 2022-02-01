@@ -10,7 +10,6 @@
 #include <sys/types.h>
 #include <time.h>
 
-#include "Draw.h"
 #include "compgeo.h"
 #include "x11layer.h"
 
@@ -114,6 +113,7 @@ void MainWindowLoopback(){
 				break;
 			case KeyPress:
 				if(e.xkey.keycode == XKeysymToKeycode(offscreen->dpy,XK_P)){
+					ClearGeometry();
 					ClearScreen(offscreen->framebuffer, 0);
 					MPI_MainHull(width, height);
 					x11RedrawDisplay(offscreen, width, height);
@@ -172,13 +172,20 @@ int main(int argc, char** argv) {
 	MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
 	MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
 
-	if(mpi_rank != MPI_MAIN_RANK){
-		MPI_ConvexHull(0);
-	} else{
+	if(mpi_rank == MPI_MAIN_RANK){
+		points = (Point2D*)malloc(sizeof(Point2D)*MAXPOINTS);
+		lines = (Line2D*)malloc(sizeof(Line2D)*MAXPOINTS/2);
+		polygons = (Polygon2D*)malloc(sizeof(Polygon2D)*MAXPOINTS/3);
+		memset(points, 0, MAXPOINTS*sizeof(Point2D));
+		memset(lines, 0, (MAXPOINTS/2)*sizeof(Line2D));
+		memset(polygons, 0, (MAXPOINTS/3)*sizeof(Polygon2D));
 		MainWindowLoopback();
+	}else{
+		MPI_ConvexHull();
 	}
 
 	MPI_Finalize();
+
 
 	return 0;
 }

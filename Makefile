@@ -1,11 +1,11 @@
 CXX=g++
 LINK=-lm -lX11
-DEBUG=-g -DDEBUG
+DEBUG=-g -DDEBUG -Og -ggdb
 CXXFLAGS=$(DEBUG)
 COMPILE=$(CXX) $(CXXFLAGS) 
 
 MPICXX=mpicxx
-MPI_LINK=$(LINK) $(shell $(MPICXX) --showme:link)
+MPI_LINK=$(LINK) $(shell $(MPICXX) --showme:link) /usr/lib64/valgrind/libmpiwrap-amd64-linux.so
 MPI_COMPILE_FLAGS=$(shell $(MPICXX) --showme:compile)
 MPI_CXXFLAGS=$(CXXFLAGS) $(MPI_COMPILE_FLAGS)
 MPI_COMPILE=$(MPICXX) $(MPI_CXXFLAGS)
@@ -29,6 +29,8 @@ build:
 	mkdir -p $(BUILD)
 
 clean:
+	rm -f \#*\#
+	rm -f *~
 	rm -rf $(BUILD) compgeo
 
 .PHONY: build clean

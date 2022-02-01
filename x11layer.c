@@ -10,15 +10,12 @@
 #include <sys/types.h>
 #include <time.h>
 
-#include "compgeo.h"
 #include "x11layer.h"
 
 int mpi_rank;
 int mpi_size;
 
 static int running = 1;
-
-void MPI_MainHull(int width, int height);
 
 void ClearScreen(Framebuffer* fb, int clscolor){
 	memset(fb->data, clscolor, fb->width*fb->height*4);
@@ -115,7 +112,7 @@ void MainWindowLoopback(){
 				if(e.xkey.keycode == XKeysymToKeycode(offscreen->dpy,XK_P)){
 					ClearGeometry();
 					ClearScreen(offscreen->framebuffer, 0);
-					MPI_MainHull(width, height);
+					p2pMainHull(width, height);
 					x11RedrawDisplay(offscreen, width, height);
 				}
 				if(e.xkey.keycode == XKeysymToKeycode(offscreen->dpy,XK_M)){
@@ -181,11 +178,10 @@ int main(int argc, char** argv) {
 		memset(polygons, 0, (MAXPOINTS/3)*sizeof(Polygon2D));
 		MainWindowLoopback();
 	}else{
-		MPI_ConvexHull();
+		p2pConvexHull();
 	}
 
 	MPI_Finalize();
-
 
 	return 0;
 }

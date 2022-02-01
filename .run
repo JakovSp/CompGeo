@@ -14,6 +14,6 @@ fi
 
 # disable running valgrind
 VALGRIND_RUN=""
-MPI_RUN="mpiexec -np 2 "
+MPI_RUN="mpiexec -np 4 "
 RUN=$VALGRIND_RUN$MPI_RUN
 $RUN ./build/compgeo

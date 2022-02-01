@@ -102,3 +102,18 @@ void UpdateGeometry(){
 		break;
 	}
 }
+
+void SortPointsByX(Point2D* pointsdata, int npoints){
+	int swapped = 1;
+	while(swapped){
+		swapped = 0;
+		for(int i = 0; i < npoints-1; i++){
+			if(pointsdata[i].x > pointsdata[i+1].x){
+				Point2D temp = pointsdata[i+1];
+				pointsdata[i+1] = pointsdata[i];
+				pointsdata[i] = temp;
+				swapped = 1;
+			}
+		}
+	}
+}

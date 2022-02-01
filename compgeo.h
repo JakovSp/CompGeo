@@ -63,10 +63,12 @@ void ClearGeometry();
 void UpdateGeometry();
 void AddGeometry(enum geotype);
 int amodb(int a, int b);
+void SortPointsByX(Point2D* pointsdata, int npoints);
 
 void MergePolygons(Polygon2D p1, Polygon2D p2);
 Polygon2D ConvexHull(Point2D* inputpoints, int npoints);
-void MPI_ConvexHull();
+void p2pConvexHull();
+void p2pMainHull(int, int);
 
 inline void DebugPrint(const char *__restrict format, ...){
 #ifdef DEBUG

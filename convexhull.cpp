@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <x86_64-pc-linux-gnu/mpi.h>
+
 #include "compgeo.h"
 
 Polygon2D ConvexHull(Point2D* inputpoints, int npoints){
@@ -14,20 +15,9 @@ Polygon2D ConvexHull(Point2D* inputpoints, int npoints){
 	memset(ConvexPolygon.points, 0, npoints*sizeof(Point2D));
 	short* upper = (short*)malloc(sizeof(short)*npoints);
 	memset(upper, 0, npoints*sizeof(short));
+	int p = 0;
 
-	// sort by x
-	int swapped = 1;
-	while(swapped){
-		swapped = 0;
-		for(int i = 0; i < npoints-1; i++){
-			if(inputpoints[i].x > inputpoints[i+1].x){
-				Point2D temp = inputpoints[i+1];
-				inputpoints[i+1] = inputpoints[i];
-				inputpoints[i] = temp;
-				swapped = 1;
-			}
-		}
-	}
+	SortPointsByX(inputpoints, npoints);
 
 	// Upper hull:
 	// add first starting point to the hull:
@@ -108,28 +98,14 @@ Polygon2D ConvexHull(Point2D* inputpoints, int npoints){
 	return ConvexPolygon;
 }
 
-// NOTE: Works correctly when convex polygons are intersecting at most once;
-// TODO: Create a separate method to cover all polygon intersection cases
-Polygon2D ConnectConvex(Polygon2D p1, Polygon2D p2){
-	// assume p1 and p2 are convex
-	Polygon2D ConvexPolygon;
-	int ta1, ta2;
-	int tb1, tb2;
-
-	// order the start of p1 and p2 by x
-	if(p1.points[0].x > p2.points[0].x){
-		Polygon2D temp = p1;
-		p1 = p2;
-		p2 = temp;
-	}
-
+void ConvexUpperTangent(Polygon2D p1, Polygon2D p2, int& ta1, int& ta2){
 	// Upper tangent
 	// test left-top line segment
 	for(int top = 0; top <= p1.numpoints-1; top=amodb(top+1,p1.numpoints)){
 		int test = 1;
 		int left = amodb((top-1),p1.numpoints);
 		int right = amodb((top+1),p1.numpoints);
-		tb2 = 0;
+		ta2 = 0;
 		double diff = 0;
 		double r = DBL_MAX;
 		// if left-top segment is covering *ALL* points in opposing polygon:
@@ -163,6 +139,9 @@ Polygon2D ConnectConvex(Polygon2D p1, Polygon2D p2){
 		}
 	}
 
+}
+
+void ConvexLowerTangent(Polygon2D p1, Polygon2D p2, int& tb1, int& tb2){
 	// Lower tangent
 	for(int left = 1; left != 2; left=amodb((left-1),p1.numpoints)){
 		int test = 1;
@@ -195,6 +174,26 @@ Polygon2D ConnectConvex(Polygon2D p1, Polygon2D p2){
 			break;
 		}
 	}
+}
+
+
+// NOTE: Works correctly when convex polygons are intersecting at most twice;
+// TODO: Create a separate method to cover all polygon intersection cases
+Polygon2D ConnectConvex(Polygon2D p1, Polygon2D p2){
+	int ta1, ta2, tb1, tb2;
+
+	// order the start of p1 and p2 by x
+	Polygon2D MergedPolygon;
+	if(p1.points[0].x > p2.points[0].x){
+		Polygon2D temp = p1;
+		p1 = p2;
+		p2 = temp;
+	}
+
+	// NOTE: Construction of upper and lower tangent is independent
+	// TODO: Parallel stitching hulls
+	ConvexUpperTangent(p1, p2, ta1, ta2);
+	ConvexLowerTangent(p1, p2, tb1, tb2);
 
 	int firsthull = ta1+1;
 	int secondhull = 0;
@@ -203,42 +202,44 @@ Polygon2D ConnectConvex(Polygon2D p1, Polygon2D p2){
 	} else {
 		secondhull = p2.numpoints-ta2+1;
 	}
-	int thirdhull=0;
+	int thirdhull = 0;
 	if(tb1)
 		thirdhull = p1.numpoints-tb1;
 
-	ConvexPolygon.numpoints = firsthull + secondhull + thirdhull;
+	MergedPolygon.numpoints = firsthull + secondhull + thirdhull;
 								
-	ConvexPolygon.points = (Point2D*)malloc(sizeof(Point2D)*ConvexPolygon.numpoints);
-	memset(ConvexPolygon.points,0,sizeof(Point2D)*ConvexPolygon.numpoints);
+	MergedPolygon.points = (Point2D*)malloc(sizeof(Point2D)*MergedPolygon.numpoints);
+	memset(MergedPolygon.points,0,sizeof(Point2D)*MergedPolygon.numpoints);
 	for(int i = 0; i < firsthull; i++)
-		ConvexPolygon.points[i] = p1.points[i];
+		MergedPolygon.points[i] = p1.points[i];
 	for(int i = 0; i < secondhull; i++)
-		ConvexPolygon.points[firsthull+i] = p2.points[(ta2+i)%p2.numpoints];
+		MergedPolygon.points[firsthull+i] = p2.points[(ta2+i)%p2.numpoints];
 	for(int i = 0; i < thirdhull; i++)
-		ConvexPolygon.points[firsthull+secondhull+i] = p1.points[tb1+i];
+		MergedPolygon.points[firsthull+secondhull+i] = p1.points[tb1+i];
 	
-	return ConvexPolygon;
+	return MergedPolygon;
 }
+
 
 void MergePolygons(Polygon2D p1, Polygon2D p2){
 	Polygon2D newpolygon = ConnectConvex(p1, p2);
-	if(p1.points)
-		free(p1.points);
-	p1.points = NULL;
-	if(p2.points)
-		free(p2.points);
-	p2.points = NULL;
+	// if(p1.points)
+	// 	free(p1.points);
+	// p1.points = NULL;
+	// if(p2.points)
+	// 	free(p2.points);
+	// p2.points = NULL;
 
-	numpolygons--;
-	polygons[numpolygons-1] = newpolygon;
+	// polygons[numpolygons-1] = newpolygon;
 }
 
-void MPI_ConvexHull(){
+void p2pConvexHull(){
 	int numdata;
 	MPI_Recv(&numdata, 1, MPI_INT, MPI_MAIN_RANK, MPI_WORKER+mpi_rank-1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 	Point2D* inputpoints = NULL;
+
 	while(numdata){
+		MPI_Request sending[mpi_size-1][2];
 		DebugPrint("Received job from Main Rank(%d)\n", MPI_MAIN_RANK);
 		if(inputpoints){
 			if(inputpoints)
@@ -255,9 +256,9 @@ void MPI_ConvexHull(){
 		Polygon2D polygon = ConvexHull(inputpoints, numdata);
 
 		DebugPrint("Sending new convex polygon\n");
-		MPI_Send(&polygon.numpoints, 1, MPI_INT, 0, 1, MPI_COMM_WORLD);
+		MPI_Ibsend(&polygon.numpoints, 1, MPI_INT, 0, 1, MPI_COMM_WORLD, &sending[mpi_rank-1][0]);
 		DebugPrint("Sending %d data\n", polygon.numpoints);
-		MPI_Send(polygon.points, polygon.numpoints*sizeof(Point2D), MPI_BYTE, 0, 2, MPI_COMM_WORLD);
+		MPI_Ibsend(polygon.points, polygon.numpoints*sizeof(Point2D), MPI_BYTE, 0, 2, MPI_COMM_WORLD, &sending[mpi_rank-1][0]);
 		MPI_Recv(&numdata, 1, MPI_INT, MPI_MAIN_RANK, MPI_WORKER+mpi_rank-1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 		DebugPrint("Received new task, clearing geometry\n", polygon.numpoints);
 	}
@@ -266,10 +267,13 @@ void MPI_ConvexHull(){
 		free(inputpoints);
 }
 
-
-void MPI_MainHull(int width, int height){
+// TODO: Implement non-contiguous polygon stitching?
+void p2pMainHull(int width, int height){
 	// randomize points across width and height
 	int numdata = SAMPLE_SIZE;
+	int widthspan = 0; int heightspan = 0;
+	MPI_Request receiving[mpi_size-1];
+	MPI_Request sending[mpi_size-1];
 
 	DebugPrint("Generating random points\n");
 	srand(time(NULL));
@@ -279,30 +283,71 @@ void MPI_MainHull(int width, int height){
 		numpoints++;
 		adding_end=numpoints-1;
 	}
-	
+	widthspan = SAMPLE_SIZE/mpi_size;
+
+	SortPointsByX(points, SAMPLE_SIZE);
+
 	// Initial hull
-	// TODO: Emulate IPC using shared memory across *MPI Communicator*. One
-	// communicator per shared memory domain
 	for(int i = 1; i<mpi_size; i++){
-
-		DebugPrint("Sending %d data to Rank: %d\n", numdata, i);
-		// QUERY: Immediate send? Buffered send? 
-		MPI_Send(&numdata, 1, MPI_INT, i, MPI_WORKER+i-1, MPI_COMM_WORLD);
-		MPI_Send(&points[adding_start], numdata*sizeof(Point2D), MPI_BYTE, i, 
-				  MPI_WORKER+i-1, MPI_COMM_WORLD);
-
-		// ConvexHull(Point2D *inputpoints, int npoints);
-
-		DebugPrint("Waiting for new polygon data from Rank: %d\n", i);
-		MPI_Recv(&(polygons[numpolygons].numpoints), 1, MPI_INT, i, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE); 
-		polygons[numpolygons].points = (Point2D*)malloc(polygons[numpolygons].numpoints*sizeof(Point2D));
-		MPI_Recv(polygons[numpolygons].points, polygons[numpolygons].numpoints*sizeof(Point2D), MPI_BYTE, i, 2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-		DebugPrint("Received %d new polygon data from Rank: %d\n", 
-				   polygons[numpolygons].numpoints, i);
-		numpolygons++;
+		// Split data to all the ranks
+		DebugPrint("Sending %d data to Rank: %d\n", widthspan, i);
+		// QUERY: Immediate + Buffered send? 
+		MPI_Ibsend(&widthspan, 1, MPI_INT, i, MPI_WORKER+i-1, MPI_COMM_WORLD, &sending[i-1]);
+		MPI_Ibsend(&points[widthspan*i], widthspan*sizeof(Point2D), MPI_BYTE, i, MPI_WORKER+i-1, MPI_COMM_WORLD, &sending[i-1]);
 	}
 
-	// TODO: Parallel stitching hulls
-	// QUERY: Using OpenMP?
-	// MergePolygons(Polygon2D p1, Polygon2D p2);
+	for(int i = 1; i<mpi_size; i++){
+		DebugPrint("Waiting for new polygon data from Rank: %d\n", i);
+		MPI_Irecv(&(polygons[numpolygons+i].numpoints), 1, MPI_INT, i, 1, MPI_COMM_WORLD, &receiving[i-1]); 
+	}
+
+	polygons[numpolygons] = ConvexHull(&points[0], widthspan);
+
+	// TODO: Try implementing MPI_ANY_TAG Receive
+	for(int i = 1; i<mpi_size; i++){
+		DebugPrint("Waiting for new polygon data from Rank: %d\n", i);
+		MPI_Wait(&receiving[i-1], MPI_STATUS_IGNORE);
+		polygons[numpolygons+i].points = (Point2D*)malloc(polygons[numpolygons+i].numpoints*sizeof(Point2D));
+		MPI_Recv(polygons[numpolygons+i].points, polygons[numpolygons+i].numpoints*sizeof(Point2D), MPI_BYTE, i, 2, MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+		DebugPrint("Received %d new polygon data from Rank: %d\n", polygons[numpolygons+i].numpoints, i);
+		polygons[numpolygons] = ConnectConvex(polygons[numpolygons], polygons[numpolygons+i]);
+		DebugPrint("Merged with Rank %d polygon\n", i);
+	}
+
+	// numpolygons+=mpi_size;
+	numpolygons++;
+
 }
+
+// void collConvexHull(){
+// 	int numdata = 0;
+// 	Point2D* inputdata;
+// 	MPI_Recv(&numdata, 1, MPI_INT, MPI_MAIN_RANK, MPI_WORKER+mpi_rank-1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+// 	MPI_Scatter(points, numdata*sizeof(Point2D), MPI_BYTE, inputdata, numdata*sizeof(Point2D), MPI_BYTE, mpi_rank, MPI_COMM_WORLD);
+// 	if(mpi_rank != 0){
+// 	}
+// 	MPI_Gather(points, widthspan*sizeof(Point2D), MPI_BYTE, inputpoints, widthspan*sizeof(Point2D), MPI_BYTE, 0, MPI_COMM_WORLD);
+// 	MPI_Wait();
+// }
+
+// void collMainHull(int width, int height){
+// 	// randomize points across width and height
+// 	int numdata = SAMPLE_SIZE;
+// 	int widthspan = 0; int heightspan = 0;
+// 	MPI_Request receiving[mpi_size-1];
+// 	MPI_Request sending[mpi_size-1];
+
+// 	DebugPrint("Generating random points\n");
+// 	srand(time(NULL));
+// 	for(int i = 0; i < SAMPLE_SIZE; i++){
+// 		points[i].x = 200 + rand()%(width-400);
+// 		points[i].y = 150 + rand()%(height-300);
+// 		numpoints++;
+// 		adding_end=numpoints-1;
+// 	}
+// 	widthspan = SAMPLE_SIZE/mpi_size;
+
+// 	SortPointsByX(points, SAMPLE_SIZE);
+
+// 	MPI_Scatter(points, widthspan*sizeof(Point2D), MPI_BYTE, inputpoints, widthspan*sizeof(Point2D), MPI_BYTE, 0, MPI_COMM_WORLD);
+// }

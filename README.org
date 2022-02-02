@@ -4,11 +4,12 @@ Convex hull of set of points is the smallest convex polygon that contains all of
 Convex polygon is a polygon such that every line segment between any of two points within the polygon, is also contained inside that polygon.\\
 
 *** Controls
-L - add new line \\
-C - add new convex hull \\
-M - merge/stitch together last two convex hulls into a new convex hull \\
-Space - clear all geometry \\
-Esc - quit \\
+P - generate random set of points and perform parallel convex hull\\
+L - add new line\\
+C - add new convex hull\\
+M - merge/stitch together last two convex hulls into a new convex hull\\
+Space - clear all geometry\\
+Esc - quit\\
 
 ** Voronoi Diagram
 Given set of N points/sites in a plane, Voronoi diagram is a subdivision of a plane into N cells, corresponding to the points/sites.

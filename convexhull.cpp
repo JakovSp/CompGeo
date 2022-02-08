@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <x86_64-pc-linux-gnu/mpi.h>
 
 #include "compgeo.h"
@@ -182,7 +183,8 @@ void ConvexLowerTangent(Polygon2D p1, Polygon2D p2, int& tb1, int& tb2){
 Polygon2D ConnectConvex(Polygon2D p1, Polygon2D p2){
 	int ta1, ta2, tb1, tb2;
 
-	// order the start of p1 and p2 by x
+	// NOTE: Order the start of p1 and p2 by x.
+	// Necessary condition for commutativity
 	Polygon2D MergedPolygon;
 	if(p1.points[0].x > p2.points[0].x){
 		Polygon2D temp = p1;
@@ -190,8 +192,23 @@ Polygon2D ConnectConvex(Polygon2D p1, Polygon2D p2){
 		p2 = temp;
 	}
 
-	// NOTE: Construction of upper and lower tangent is independent
-	// TODO: Parallel stitching hulls
+	// NOTE: Construction of upper and lower tangent is independent.
+	// Necessary condition for associativity
+	// TODO: Parallel stitching hulls. Split the job on upper and lower
+	// construction
+
+
+	// Algorithm:
+	// #1 Send SUBHULL signal
+	// #2 Send TANGENT signal
+	// #3 AsyncWait on TANGENT
+	// #4 If AsyncWait is not completed: go first and send TANGENT signal
+	//         Create Upper hull
+	// else
+	//         Create Lower hull and send TANGENT signal
+	//         Finalize
+	// #5 Construct Final hull and send SUBHULL signal
+
 	ConvexUpperTangent(p1, p2, ta1, ta2);
 	ConvexLowerTangent(p1, p2, tb1, tb2);
 
@@ -268,15 +285,21 @@ void p2pConvexHull(){
 }
 
 // TODO: Implement non-contiguous polygon stitching?
-void p2pMainHull(int width, int height){
+void p2pMainHull(int width, int height) {
 	// randomize points across width and height
+	struct timeval tv;
 	int numdata = SAMPLE_SIZE;
 	int widthspan = 0; int heightspan = 0;
 	MPI_Request receiving[mpi_size-1];
 	MPI_Request sending[mpi_size-1];
 
+	gettimeofday(&tv, NULL);
+	unsigned long long millisecondsSinceEpoch =
+		(unsigned long long)(tv.tv_sec) * 1000 +
+		(unsigned long long)(tv.tv_usec) / 1000;
+	srand(millisecondsSinceEpoch);
+
 	DebugPrint("Generating random points\n");
-	srand(time(NULL));
 	for(int i = 0; i < SAMPLE_SIZE; i++){
 		points[i].x = 200 + rand()%(width-400);
 		points[i].y = 150 + rand()%(height-300);
@@ -314,8 +337,8 @@ void p2pMainHull(int width, int height){
 		DebugPrint("Merged with Rank %d polygon\n", i);
 	}
 
-	// numpolygons+=mpi_size;
-	numpolygons++;
+	numpolygons+=mpi_size;
+	// numpolygons++;
 
 }
 
@@ -349,5 +372,14 @@ void p2pMainHull(int width, int height){
 
 // 	SortPointsByX(points, SAMPLE_SIZE);
 
+
 // 	MPI_Scatter(points, widthspan*sizeof(Point2D), MPI_BYTE, inputpoints, widthspan*sizeof(Point2D), MPI_BYTE, 0, MPI_COMM_WORLD);
+// 	MPI_Op_commutative(MPI_Op op, int *commute)
+
+// 	// NOTE: Connecting convex polygons with tangents is commutative and associative, it can be
+// 	// used as reduce operation effectively.
+// 	// Since it is necessary to have at least two polygons constructed to call
+// 	// ConnectConvex (), the trigger for ANY_TAG or MPI_Test on ANY_RANK, could be
+// 	// used to initiate the function.
+// 	// QUERY: Data from single rank polygons could be broadcast to all?
 // }

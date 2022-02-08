@@ -1,5 +1,5 @@
-#include <fstream>
 #include <openmpi/ompi/mpi/cxx/mpicxx.h>
+#include <x86_64-pc-linux-gnu/mpi.h>
 #include <X11/X.h>
 #include <X11/Xlib.h>
 #include <stdio.h>

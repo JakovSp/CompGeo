@@ -1,9 +1,9 @@
 #ifndef COMPGEO
 #define COMPGEO
+#include <openmpi/ompi/mpi/cxx/mpicxx.h>
 #include <stdlib.h>
 #include <math.h>
 
-#include <openmpi/ompi/mpi/cxx/mpicxx.h>
 extern int mpi_rank;
 extern int mpi_size;
 #define MPI_MAIN_RANK 0

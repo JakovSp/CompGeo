@@ -3,9 +3,6 @@ LEAK_FLAGS="--leak-check=full --show-leak-kinds=all"
 VALGRIND_TOOL="--tool=memcheck"
 VALGRIND_FLAGS="$VALGRIND_TOOL $LEAK_FLAGS"
 
-BEAR="$(command -v bear)" 
-$BEAR make -k
-
 VALGRIND_RUN="$(command -v valgrind)" 
 if test -f $VALGRIND
 then

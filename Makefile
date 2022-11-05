@@ -1,14 +1,16 @@
-CXX=g++
+CXX=clang++
 LINK=-lm -lX11
 DEBUG=-g -DDEBUG -Og -ggdb
-CXXFLAGS=$(DEBUG)
+CXXFLAGS=$(DEBUG) -fPIE
 COMPILE=$(CXX) $(CXXFLAGS) 
 
 BUILD=build
 OBJECTS = $(BUILD)/Draw.o $(BUILD)/x11layer.o $(BUILD)/convexhull.o
+# VALGRIND=/usr/lib64/valgrind/libmpiwrap-amd64-linux.so
+VALGRIND=
 
 MPICXX=mpicxx
-MPI_LINK=$(shell $(MPICXX) --showme:link) /usr/lib64/valgrind/libmpiwrap-amd64-linux.so
+MPI_LINK=$(shell $(MPICXX) --showme:link) $(VALGRIND)
 MPI_COMPILE_FLAGS=$(shell $(MPICXX) --showme:compile)
 MPI_CXXFLAGS=$(CXXFLAGS) $(MPI_COMPILE_FLAGS)
 MPI_COMPILE=$(MPICXX) $(MPI_CXXFLAGS)

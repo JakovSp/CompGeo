@@ -1,5 +1,6 @@
 #ifndef COMPGEO
 #define COMPGEO
+#include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 

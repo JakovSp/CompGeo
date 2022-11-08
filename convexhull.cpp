@@ -230,7 +230,8 @@ void MergePolygons(Polygon2D p1, Polygon2D p2){
 	// 	free(p2.points);
 	// p2.points = NULL;
 
-	// polygons[numpolygons-1] = newpolygon;
+	polygons[numpolygons] = newpolygon;
+	numpolygons++;
 }
 
 void p2pConvexHull(){
